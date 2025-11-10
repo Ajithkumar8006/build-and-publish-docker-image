@@ -1,0 +1,71 @@
+name: Build and Push Docker Image to Artifact Registry
+
+on:
+  workflow_call:  # 👈 allows other workflows to call this one
+    inputs:
+      image_name:
+        description: 'Name of the image (without tag)'
+        required: true
+        type: string
+      tag:
+        description: 'Tag for the Docker image'
+        required: false
+        default: 'latest'
+        type: string
+      region:
+        description: 'GCP region (e.g., us-central1)'
+        required: false
+        default: 'us-central1'
+        type: string
+      project_id:
+        description: 'Google Cloud Project ID'
+        required: true
+        type: string
+      workload_identity_provider:
+        description: 'Full path to Workload Identity Provider'
+        required: true
+        type: string
+      service_account:
+        description: 'Service account email for authentication'
+        required: true
+        type: string
+
+jobs:
+  build-and-push:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: 'read'
+      id-token: 'write'  # required for OIDC authentication
+
+    steps:
+      # 1️⃣ Checkout source code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2️⃣ Authenticate to Google Cloud using OIDC (no key needed)
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          token_format: access_token
+          workload_identity_provider: ${{ inputs.workload_identity_provider }}
+          service_account: ${{ inputs.service_account }}
+
+      # 3️⃣ Setup Google Cloud SDK
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ inputs.project_id }}
+
+      # 4️⃣ Configure Docker to use gcloud credential helper
+      - name: Configure Docker authentication
+        run: gcloud auth configure-docker ${{ inputs.region }}-docker.pkg.dev --quiet
+
+      # 5️⃣ Build and push the Docker image
+      - name: Build and Push Docker image
+        run: |
+          IMAGE_URI=${{ inputs.region }}-docker.pkg.dev/${{ inputs.project_id }}/containers/${{ inputs.image_name }}:${{ inputs.tag }}
+          echo "Building image: $IMAGE_URI"
+          docker build -t "$IMAGE_URI" .
+          docker push "$IMAGE_URI"
