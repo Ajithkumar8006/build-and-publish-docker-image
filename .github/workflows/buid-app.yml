@@ -17,3 +17,5 @@ jobs:
       project_id: apigee-12092025
       workload_identity_provider: projects/352535210260/locations/global/workloadIdentityPools/github-pool/providers/github-provider
       service_account: github-actions@apigee-12092025.iam.gserviceaccount.com
+      context: ./app
+      dockerfile: ./app/Dockerfile
