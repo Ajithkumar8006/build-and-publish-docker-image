@@ -75,5 +75,5 @@ jobs:
         run: |
           IMAGE_URI=${{ inputs.region }}-docker.pkg.dev/${{ inputs.project_id }}/containers/${{ inputs.image_name }}:${{ inputs.tag }}
           echo "Building image: $IMAGE_URI"
-          docker build -t "$IMAGE_URI" .
+          docker build -t "$IMAGE_URI" -f "${{ inputs.dockerfile }}" "${{ inputs.context }}"
           docker push "$IMAGE_URI"
