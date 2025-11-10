@@ -1,22 +1,23 @@
-name: Deploy to GCP
+name: Manual Deploy to GCP
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:  # 👈 allows manual triggering from GitHub Actions UI
 
 jobs:
   deploy:
+    name: Deploy to GCP
     runs-on: ubuntu-latest
 
     permissions:
       contents: 'read'
-      id-token: 'write'  # required for OIDC
+      id-token: 'write'  # 👈 required for Workload Identity Federation (OIDC)
 
     steps:
+      # Checkout the source code
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Authenticate to Google Cloud using OIDC (no JSON key!)
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
@@ -24,10 +25,20 @@ jobs:
           workload_identity_provider: "projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/github-pool/providers/github-provider"
           service_account: "github-actions@apigee-12092025.iam.gserviceaccount.com"
 
-      - name: Setup gcloud
+      # Setup gcloud SDK
+      - name: Setup gcloud SDK
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: apigee-12092025
 
-      - name: Verify authentication
+      # Verify authentication (optional)
+      - name: Verify gcloud auth
         run: gcloud auth list
+
+      # Example deploy step (replace with your actual command)
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy my-service \
+            --source . \
+            --region us-central1 \
+            --allow-unauthenticated
