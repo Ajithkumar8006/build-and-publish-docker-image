@@ -1,4 +1,4 @@
-name: Build App Image
+name: Ubuntu Build App Image
 
 on:
   workflow_dispatch:  # manual trigger
