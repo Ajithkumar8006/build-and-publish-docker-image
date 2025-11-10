@@ -29,6 +29,14 @@ on:
         description: 'Service account email for authentication'
         required: true
         type: string
+      context:                # 👈 ADD THIS
+        description: 'Docker build context path'
+        default: '.'
+        type: string
+      dockerfile:             # 👈 ADD THIS
+        description: 'Path to Dockerfile'
+        default: 'Dockerfile'
+        type: string
 
 jobs:
   build-and-push:
