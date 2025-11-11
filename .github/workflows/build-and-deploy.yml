@@ -113,5 +113,18 @@ jobs:
             --region us-central1 \
             --port 80 \
             --allow-unauthenticated
-
+      # 7️⃣ Explicit Cloud Run update (optional, ensures latest image)
+      - name: Update Cloud Run service
+        if: ${{ inputs.deploy_to_cloud_run == 'true' }}
+        run: |
+          SERVICE=${{ inputs.service_name }}
+          if [ -z "$SERVICE" ]; then
+            SERVICE=${{ inputs.image_name }}
+          fi
+          IMAGE_URI=${{ steps.build.outputs.image_uri }}
+      
+          echo "Updating Cloud Run service $SERVICE with latest image $IMAGE_URI"
+          gcloud run services update "$SERVICE" \
+            --image "$IMAGE_URI" \
+            --region "${{ inputs.region }}"
 
