@@ -109,5 +109,6 @@ jobs:
             --region "${{ inputs.region }}" \
             --platform managed \
             --allow-unauthenticated \
-            --port 80 \        # 👈 tell Cloud Run to expect port 80
+            --port 80 \
             --project "${{ inputs.project_id }}"
+
