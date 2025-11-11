@@ -1,7 +1,7 @@
-name: Build and Deploy Demo Nginx
+name: Build and Deploy Nginx Demo (Cloud Build)
 
 on:
-  workflow_dispatch:  # manual trigger
+  workflow_dispatch:
 
 permissions:
   id-token: write
