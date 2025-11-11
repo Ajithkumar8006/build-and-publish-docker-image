@@ -79,20 +79,24 @@ jobs:
         with:
           project_id: ${{ inputs.project_id }}
 
-      # 4️⃣ Build and push image using Cloud Build
+      # 4️⃣ Configure Docker to authenticate with Artifact Registry
+      - name: Configure Docker for Artifact Registry
+        run: |
+          gcloud auth configure-docker "${{ inputs.region }}-docker.pkg.dev" --quiet
+
+      # 5️⃣ Build and push Docker image
       - name: Build and Push Docker image
         id: build
         run: |
           IMAGE_URI=${{ inputs.region }}-docker.pkg.dev/${{ inputs.project_id }}/containers/${{ inputs.image_name }}:${{ inputs.tag }}
       
           echo "Building Docker image: $IMAGE_URI"
-          docker build -t "$IMAGE_URI" "${{ inputs.context }}"
+          docker build -t "$IMAGE_URI" -f "${{ inputs.dockerfile }}" "${{ inputs.context }}"
       
           echo "Pushing Docker image: $IMAGE_URI"
           docker push "$IMAGE_URI"
       
           echo "image_uri=$IMAGE_URI" >> $GITHUB_OUTPUT
-
 
       - name: Deploy to Cloud Run
         if: ${{ inputs.deploy_to_cloud_run == 'true' }}
