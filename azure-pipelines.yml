@@ -1,0 +1,93 @@
+trigger: none  # Manual run, like workflow_dispatch
+
+variables:
+  image_name: demo-nginx
+  tag: v1.0.0
+  region: us-central1
+  project_id: apigee-12092025
+  workload_identity_provider: projects/352535210260/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+  service_account: github-actions@apigee-12092025.iam.gserviceaccount.com
+  context: ./app
+  dockerfile: ./app/Dockerfile
+  deploy_to_cloud_run: 'true'
+  service_name: demo-nginx-service
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+stages:
+  - stage: Build_And_Deploy
+    displayName: Build and Deploy to Cloud Run
+    jobs:
+      - job: BuildPushDeploy
+        displayName: Build, Push, Deploy to Cloud Run
+        steps:
+
+          # 1️⃣ Checkout repository
+          - checkout: self
+
+          # 2️⃣ Install Google Cloud SDK
+          - task: Bash@3
+            displayName: 'Install gcloud SDK'
+            inputs:
+              targetType: 'inline'
+              script: |
+                sudo apt-get update -y
+                sudo apt-get install -y apt-transport-https ca-certificates gnupg curl
+                echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+                curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+                sudo apt-get update && sudo apt-get install -y google-cloud-sdk
+
+          # 3️⃣ Authenticate to Google Cloud via Workload Identity Federation
+          # (You must configure ADO-GCP federation manually in IAM)
+          - task: Bash@3
+            displayName: 'Authenticate to GCP (Workload Identity Federation)'
+            inputs:
+              targetType: 'inline'
+              script: |
+                echo "Authenticating with Workload Identity Federation..."
+                gcloud auth login --brief --cred-file="${GOOGLE_APPLICATION_CREDENTIALS}"
+            env:
+              GOOGLE_APPLICATION_CREDENTIALS: $(GOOGLE_APPLICATION_CREDENTIALS_JSON)
+
+          # 4️⃣ Configure project
+          - task: Bash@3
+            displayName: 'Set GCP project'
+            inputs:
+              targetType: 'inline'
+              script: |
+                gcloud config set project $(project_id)
+                gcloud config set run/region $(region)
+
+          # 5️⃣ Build and Push Docker image using Cloud Build
+          - task: Bash@3
+            displayName: 'Build and Push Docker image via Cloud Build'
+            inputs:
+              targetType: 'inline'
+              script: |
+                IMAGE_URI=$(region)-docker.pkg.dev/$(project_id)/containers/$(image_name):$(tag)
+                echo "Building image with Cloud Build: $IMAGE_URI"
+                gcloud builds submit "$(context)" \
+                  --project="$(project_id)" \
+                  --tag "$IMAGE_URI" \
+                  --gcs-log-dir="gs://cloud-build-logs-$(project_id)/logs"
+                echo "##vso[task.setvariable variable=image_uri]$IMAGE_URI"
+
+          # 6️⃣ Deploy to Cloud Run
+          - task: Bash@3
+            displayName: 'Deploy to Cloud Run'
+            condition: eq(variables['deploy_to_cloud_run'], 'true')
+            inputs:
+              targetType: 'inline'
+              script: |
+                IMAGE_URI=$(image_uri)
+                SERVICE=$(service_name)
+                if [ -z "$SERVICE" ]; then
+                  SERVICE=$(image_name)
+                fi
+                echo "Deploying $IMAGE_URI to Cloud Run service: $SERVICE"
+                gcloud run deploy "$SERVICE" \
+                  --image "$IMAGE_URI" \
+                  --region $(region) \
+                  --port 80 \
+                  --allow-unauthenticated
