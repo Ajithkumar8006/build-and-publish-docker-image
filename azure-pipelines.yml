@@ -51,6 +51,20 @@ stages:
 
           # 3️⃣ Authenticate to Google Cloud via Workload Identity Federation
           # (You must configure ADO-GCP federation manually in IAM)
+          - task: DownloadSecureFile@1
+            name: gcpkey
+            displayName: 'Download GCP key'
+            inputs:
+              secureFile: 'gcp-key.json'
+
+          - task: Bash@3
+            displayName: 'Authenticate to Google Cloud'
+            inputs:
+              targetType: 'inline'
+              script: |
+                gcloud auth activate-service-account --key-file=$(gcpkey.secureFilePath)
+                gcloud config set project $(project_id)
+                
           - task: Bash@3
             displayName: 'Authenticate to Google Cloud'
             inputs:
