@@ -102,9 +102,8 @@ jobs:
           fi
 
           echo "Deploying $IMAGE_URI to Cloud Run service: $SERVICE"
-          gcloud run deploy "$SERVICE" \
+          gcloud run deploy demo-nginx-service \
             --image "$IMAGE_URI" \
-            --region "${{ inputs.region }}" \
-            --platform managed \
-            --allow-unauthenticated \
-            --project "${{ inputs.project_id }}"
+            --region us-central1 \
+            --allow-unauthenticated
+
