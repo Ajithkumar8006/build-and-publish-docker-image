@@ -1,5 +1,4 @@
     FROM nginx:stable-alpine
-    COPY nginx.conf /etc/nginx/nginx.conf
-    COPY html /usr/share/nginx/html # If serving static content
-    EXPOSE 8080
+    #COPY nginx.conf /etc/nginx/nginx.conf
+    COPY index.html /usr/share/nginx/html # If serving static content
     CMD ["nginx", "-g", "daemon off;"]
