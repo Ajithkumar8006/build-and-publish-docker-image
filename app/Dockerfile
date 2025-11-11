@@ -1,12 +1,24 @@
+# Start from the official nginx image
 FROM nginx:alpine
 
-# Copy static file (optional)
+# Copy your index.html
 COPY ./index.html /usr/share/nginx/html/index.html
 
-# Replace listen port dynamically with $PORT (Cloud Run sets this env var)
-RUN sed -i 's/listen\s\+80;/listen ${PORT};/' /etc/nginx/conf.d/default.conf
+# Replace the default nginx.conf with one that uses $PORT dynamically
+RUN rm /etc/nginx/conf.d/default.conf
 
+# Add a dynamic configuration that reads PORT from env
+# Cloud Run will pass $PORT (usually 8080)
+RUN echo 'server { \
+    listen ${PORT}; \
+    location / { \
+        root /usr/share/nginx/html; \
+        index index.html; \
+    } \
+}' > /etc/nginx/conf.d/default.conf
+
+# Expose port 8080 for local testing
 EXPOSE 8080
 
-# Start Nginx (PORT env var will be substituted at runtime)
-CMD ["/bin/sh", "-c", "sed -i 's/${PORT}/'\"$PORT\"'/g' /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]
+# Start nginx normally
+CMD ["nginx", "-g", "daemon off;"]
