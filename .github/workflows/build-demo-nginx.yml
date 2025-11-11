@@ -11,7 +11,7 @@ jobs:
   build:
     uses: Ajithkumar8006/build-and-publish-docker-image/.github/workflows/build-and-deploy.yml@main
     with:
-      image_name: demo-nginx
+      image_name: demo-nginx-cloudrun
       tag: v1.0.0
       region: us-central1
       project_id: apigee-12092025
