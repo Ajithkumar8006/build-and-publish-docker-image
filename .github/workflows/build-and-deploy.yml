@@ -1,0 +1,112 @@
+name: Build, Push, and Deploy to Cloud Run
+
+on:
+  workflow_call:
+    inputs:
+      image_name:
+        description: 'Container image name'
+        required: true
+        type: string
+      tag:
+        description: 'Image tag'
+        default: latest
+        type: string
+      region:
+        description: 'GCP region'
+        default: us-central1
+        type: string
+      project_id:
+        description: 'Google Cloud Project ID'
+        required: true
+        type: string
+      workload_identity_provider:
+        description: 'Full Workload Identity Provider resource path'
+        required: true
+        type: string
+      service_account:
+        description: 'Service account email for authentication'
+        required: true
+        type: string
+      context:
+        description: 'Docker build context path'
+        default: '.'
+        type: string
+      dockerfile:
+        description: 'Path to Dockerfile'
+        default: 'Dockerfile'
+        type: string
+      deploy_to_cloud_run:
+        description: 'Whether to deploy to Cloud Run after push (true/false)'
+        default: 'true'
+        type: string
+      service_name:
+        description: 'Cloud Run service name'
+        default: ''
+        type: string
+
+    outputs:
+      image_uri:
+        description: 'The full image URI built and pushed'
+        value: ${{ jobs.build-and-deploy.outputs.image_uri }}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    outputs:
+      image_uri: ${{ steps.build.outputs.image_uri }}
+
+    steps:
+      # 1️⃣ Checkout source code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2️⃣ Authenticate with GCP using OIDC (no service account key)
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          token_format: access_token
+          workload_identity_provider: ${{ inputs.workload_identity_provider }}
+          service_account: ${{ inputs.service_account }}
+
+      # 3️⃣ Setup gcloud CLI
+      - name: Setup gcloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ inputs.project_id }}
+
+      # 4️⃣ Configure Docker for Artifact Registry
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ inputs.region }}-docker.pkg.dev --quiet
+
+      # 5️⃣ Build and push Docker image
+      - name: Build and Push Docker image
+        id: build
+        run: |
+          IMAGE_URI=${{ inputs.region }}-docker.pkg.dev/${{ inputs.project_id }}/containers/${{ inputs.image_name }}:${{ inputs.tag }}
+          echo "Building image: $IMAGE_URI"
+          docker build -t "$IMAGE_URI" -f "${{ inputs.dockerfile }}" "${{ inputs.context }}"
+          docker push "$IMAGE_URI"
+          echo "image_uri=$IMAGE_URI" >> $GITHUB_OUTPUT
+
+      # 6️⃣ Optional: Deploy to Cloud Run
+      - name: Deploy to Cloud Run
+        if: ${{ inputs.deploy_to_cloud_run == 'true' }}
+        run: |
+          IMAGE_URI=${{ steps.build.outputs.image_uri }}
+          SERVICE=${{ inputs.service_name }}
+          if [ -z "$SERVICE" ]; then
+            SERVICE="${{ inputs.image_name }}"
+          fi
+
+          echo "Deploying $IMAGE_URI to Cloud Run service: $SERVICE"
+          gcloud run deploy "$SERVICE" \
+            --image "$IMAGE_URI" \
+            --region "${{ inputs.region }}" \
+            --platform managed \
+            --allow-unauthenticated \
+            --project "${{ inputs.project_id }}"
