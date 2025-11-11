@@ -1,4 +1,4 @@
-name: Build, Push, and Deploy to Cloud Run
+name: Build, Push, and Deploy to Cloud Run (with Cloud Build)
 
 on:
   workflow_call:
@@ -61,11 +61,11 @@ jobs:
       image_uri: ${{ steps.build.outputs.image_uri }}
 
     steps:
-      # 1️⃣ Checkout source code
+      # 1️⃣ Checkout source
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2️⃣ Authenticate with GCP using OIDC (no service account key)
+      # 2️⃣ Authenticate to GCP via OIDC
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
@@ -79,21 +79,19 @@ jobs:
         with:
           project_id: ${{ inputs.project_id }}
 
-      # 4️⃣ Configure Docker for Artifact Registry
-      - name: Configure Docker for Artifact Registry
-        run: gcloud auth configure-docker ${{ inputs.region }}-docker.pkg.dev --quiet
-
-      # 5️⃣ Build and push Docker image
-      - name: Build and Push Docker image
+      # 4️⃣ Build and push image using Cloud Build
+      - name: Build and Push Docker image (Cloud Build)
         id: build
         run: |
           IMAGE_URI=${{ inputs.region }}-docker.pkg.dev/${{ inputs.project_id }}/containers/${{ inputs.image_name }}:${{ inputs.tag }}
-          echo "Building image: $IMAGE_URI"
-          docker build -t "$IMAGE_URI" -f "${{ inputs.dockerfile }}" "${{ inputs.context }}"
-          docker push "$IMAGE_URI"
+          echo "Building image with Cloud Build: $IMAGE_URI"
+          gcloud builds submit "${{ inputs.context }}" \
+            --project="${{ inputs.project_id }}" \
+            --tag "$IMAGE_URI" \
+            --gcs-log-dir="gs://cloud-build-logs-${{ inputs.project_id }}/logs"
           echo "image_uri=$IMAGE_URI" >> $GITHUB_OUTPUT
 
-      # 6️⃣ Optional: Deploy to Cloud Run
+      # 5️⃣ Deploy to Cloud Run (optional)
       - name: Deploy to Cloud Run
         if: ${{ inputs.deploy_to_cloud_run == 'true' }}
         run: |
@@ -109,6 +107,4 @@ jobs:
             --region "${{ inputs.region }}" \
             --platform managed \
             --allow-unauthenticated \
-            --port 80 \
             --project "${{ inputs.project_id }}"
-
