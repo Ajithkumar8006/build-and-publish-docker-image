@@ -91,19 +91,19 @@ jobs:
             --gcs-log-dir="gs://cloud-build-logs-${{ inputs.project_id }}/logs"
           echo "image_uri=$IMAGE_URI" >> $GITHUB_OUTPUT
 
-      # 5️⃣ Deploy to Cloud Run (optional)
       - name: Deploy to Cloud Run
         if: ${{ inputs.deploy_to_cloud_run == 'true' }}
         run: |
           IMAGE_URI=${{ steps.build.outputs.image_uri }}
           SERVICE=${{ inputs.service_name }}
           if [ -z "$SERVICE" ]; then
-            SERVICE="${{ inputs.image_name }}"
+            SERVICE=${{ inputs.image_name }}
           fi
-
+      
           echo "Deploying $IMAGE_URI to Cloud Run service: $SERVICE"
-          gcloud run deploy demo-nginx-service \
+          gcloud run deploy "$SERVICE" \
             --image "$IMAGE_URI" \
             --region us-central1 \
             --allow-unauthenticated
+
 
