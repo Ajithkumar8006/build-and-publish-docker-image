@@ -1,17 +1,11 @@
+# Use the official lightweight Nginx image
 FROM nginx:alpine
 
-COPY ./index.html /usr/share/nginx/html/index.html
+# Copy a custom Nginx config file if you have one (optional)
+# COPY nginx.conf /etc/nginx/nginx.conf
 
-# Replace the default nginx config so it uses the Cloud Run PORT variable
-RUN rm /etc/nginx/conf.d/default.conf
-RUN echo 'server { \
-    listen ${PORT}; \
-    location / { \
-        root /usr/share/nginx/html; \
-        index index.html; \
-    } \
-}' > /etc/nginx/conf.d/default.conf
-
+# Expose port 8080 to match Cloud Run's expected PORT environment variable
 EXPOSE 8080
 
+# Run Nginx in the foreground
 CMD ["nginx", "-g", "daemon off;"]
