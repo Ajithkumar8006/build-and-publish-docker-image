@@ -28,15 +28,26 @@ stages:
 
           # 2️⃣ Install Google Cloud SDK
           - task: Bash@3
-            displayName: 'Install gcloud SDK'
+            displayName: 'Install gcloud SDK (fixed key method)'
             inputs:
               targetType: 'inline'
               script: |
+                set -e
                 sudo apt-get update -y
                 sudo apt-get install -y apt-transport-https ca-certificates gnupg curl
-                echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
-                curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
-                sudo apt-get update && sudo apt-get install -y google-cloud-sdk
+          
+                # Add the Google Cloud public key securely
+                curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | \
+                  gpg --dearmor | sudo tee /usr/share/keyrings/cloud.google.gpg >/dev/null
+          
+                # Add the repository
+                echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | \
+                  sudo tee /etc/apt/sources.list.d/google-cloud-sdk.list
+          
+                # Update and install gcloud
+                sudo apt-get update -y
+                sudo apt-get install -y google-cloud-sdk
+
 
           # 3️⃣ Authenticate to Google Cloud via Workload Identity Federation
           # (You must configure ADO-GCP federation manually in IAM)
