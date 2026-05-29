@@ -1,0 +1,29 @@
+name: CURL Trigger Demo
+
+on:
+  workflow_dispatch:
+    inputs:
+      incident:
+        description: "Incident Number"
+        required: true
+
+      priority:
+        description: "Priority"
+        required: true
+
+
+jobs:
+
+  test-job:
+
+    runs-on: ubuntu-latest
+
+
+    steps:
+
+    - name: Print Trigger Details
+      run: |
+        echo "Workflow triggered successfully"
+        echo "Incident: ${{ inputs.incident }}"
+        echo "Priority: ${{ inputs.priority }}"
+        echo "Started automation..."
