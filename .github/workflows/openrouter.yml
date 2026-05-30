@@ -1,105 +1,151 @@
 name: OpenRouter Document Generator
 
 on:
-  workflow_dispatch:
-  push:
-    paths:
-      - prompt.txt
+workflow_dispatch:
+push:
+paths:
+- prompt.txt
 
 jobs:
-  generate:
-    runs-on: ubuntu-latest
+generate:
+runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+```
+steps:
+  - name: Checkout Repository
+    uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+  - name: Setup Python
+    uses: actions/setup-python@v5
+    with:
+      python-version: "3.11"
 
-      - name: Install Dependencies
-        run: |
-          pip install requests python-docx
+  - name: Install Dependencies
+    run: |
+      pip install requests python-docx reportlab
 
-      - name: Generate Document
-        env:
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-        run: |
-          python << 'EOF'
-          import os
-          import json
-          import requests
-          from docx import Document
+  - name: Generate File
+    env:
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+    run: |
+      python << 'EOF'
+      import os
+      import re
+      import json
+      import requests
+      from docx import Document
+      from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+      from reportlab.lib.styles import getSampleStyleSheet
 
-          API_KEY = os.environ["OPENROUTER_API_KEY"]
+      api_key = os.environ["OPENROUTER_API_KEY"]
 
-          with open("prompt.txt", "r", encoding="utf-8") as f:
-              prompt = f.read().strip()
+      with open("prompt.txt", "r", encoding="utf-8") as f:
+          prompt_text = f.read()
 
-          response = requests.post(
-              "https://openrouter.ai/api/v1/chat/completions",
-              headers={
-                  "Authorization": f"Bearer {API_KEY}",
-                  "Content-Type": "application/json"
-              },
-              json={
-                  "model": "openai/gpt-oss-20b:free",
-                  "messages": [
-                      {
-                          "role": "user",
-                          "content": prompt
-                      }
-                  ]
-              },
-              timeout=300
-          )
+      output_format = "TXT"
 
-          print("Status:", response.status_code)
+      match = re.search(
+          r'OUTPUT_FORMAT\s*=\s*(TXT|DOCX|PDF)',
+          prompt_text,
+          re.IGNORECASE
+      )
 
-          result = response.json()
+      if match:
+          output_format = match.group(1).upper()
 
-          if "choices" not in result:
-              print(json.dumps(result, indent=2))
-              raise Exception("OpenRouter request failed")
+      prompt_text = re.sub(
+          r'OUTPUT_FORMAT\s*=\s*(TXT|DOCX|PDF)',
+          '',
+          prompt_text,
+          flags=re.IGNORECASE
+      ).strip()
 
-          answer = result["choices"][0]["message"]["content"]
+      response = requests.post(
+          "https://openrouter.ai/api/v1/chat/completions",
+          headers={
+              "Authorization": f"Bearer {api_key}",
+              "Content-Type": "application/json"
+          },
+          json={
+              "model": "openai/gpt-oss-20b:free",
+              "messages": [
+                  {
+                      "role": "user",
+                      "content": prompt_text
+                  }
+              ]
+          },
+          timeout=300
+      )
 
-          if "Output format: DOCX" in prompt.upper():
-              doc = Document()
-              doc.add_heading("AI Generated Document", level=1)
-              doc.add_paragraph(answer)
-              doc.save("output.docx")
+      print("Status:", response.status_code)
 
-              with open("artifact_name.txt", "w") as f:
-                  f.write("output.docx")
+      result = response.json()
 
-              print("Generated output.docx")
+      if "choices" not in result:
+          print(json.dumps(result, indent=2))
+          raise Exception("OpenRouter request failed")
 
-          else:
-              with open("output.txt", "w", encoding="utf-8") as f:
-                  f.write(answer)
+      answer = result["choices"][0]["message"]["content"]
 
-              with open("artifact_name.txt", "w") as f:
-                  f.write("output.txt")
+      artifact_file = ""
 
-              print("Generated output.txt")
+      if output_format == "DOCX":
+          doc = Document()
+          doc.add_heading("AI Generated Document", level=1)
 
-          EOF
+          for line in answer.splitlines():
+              if line.strip():
+                  doc.add_paragraph(line)
 
-      - name: Upload TXT Artifact
-        if: hashFiles('output.txt') != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: ai-output-txt
-          path: output.txt
-          retention-days: 30
+          artifact_file = "output.docx"
+          doc.save(artifact_file)
 
-      - name: Upload DOCX Artifact
-        if: hashFiles('output.docx') != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: ai-output-docx
-          path: output.docx
-          retention-days: 30
+      elif output_format == "PDF":
+          artifact_file = "output.pdf"
+
+          pdf = SimpleDocTemplate(artifact_file)
+          styles = getSampleStyleSheet()
+
+          content = []
+
+          for line in answer.splitlines():
+              if line.strip():
+                  content.append(
+                      Paragraph(line, styles["BodyText"])
+                  )
+                  content.append(Spacer(1, 6))
+
+          pdf.build(content)
+
+      else:
+          artifact_file = "output.txt"
+
+          with open(
+              artifact_file,
+              "w",
+              encoding="utf-8"
+          ) as f:
+              f.write(answer)
+
+      with open("artifact_name.txt", "w") as f:
+          f.write(artifact_file)
+
+      print(f"Generated {artifact_file}")
+      EOF
+
+  - name: Verify Output
+    run: |
+      ls -lah
+
+  - name: Upload Artifact
+    uses: actions/upload-artifact@v4
+    with:
+      name: ai-generated-output
+      path: |
+        output.txt
+        output.docx
+        output.pdf
+      if-no-files-found: ignore
+      retention-days: 30
+```
