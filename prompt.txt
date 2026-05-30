@@ -8,3 +8,6 @@ Include:
 - Architecture
 - Best Practices
 - Security Considerations
+
+
+and generate word file "docx "
