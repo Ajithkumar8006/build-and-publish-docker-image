@@ -1,4 +1,4 @@
-name: OpenRouter Prompt Processor
+name: OpenRouter Document Generator
 
 on:
   workflow_dispatch:
@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Setup Python
@@ -19,19 +19,21 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
-        run: pip install requests
+      - name: Install Dependencies
+        run: |
+          pip install requests python-docx
 
-      - name: Generate output.txt
+      - name: Generate Document
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
           python << 'EOF'
-          import requests
-          import json
           import os
+          import json
+          import requests
+          from docx import Document
 
-          api_key = os.environ["OPENROUTER_API_KEY"]
+          API_KEY = os.environ["OPENROUTER_API_KEY"]
 
           with open("prompt.txt", "r", encoding="utf-8") as f:
               prompt = f.read().strip()
@@ -39,7 +41,7 @@ jobs:
           response = requests.post(
               "https://openrouter.ai/api/v1/chat/completions",
               headers={
-                  "Authorization": f"Bearer {api_key}",
+                  "Authorization": f"Bearer {API_KEY}",
                   "Content-Type": "application/json"
               },
               json={
@@ -50,8 +52,11 @@ jobs:
                           "content": prompt
                       }
                   ]
-              }
+              },
+              timeout=300
           )
+
+          print("Status:", response.status_code)
 
           result = response.json()
 
@@ -61,15 +66,40 @@ jobs:
 
           answer = result["choices"][0]["message"]["content"]
 
-          with open("output.txt", "w", encoding="utf-8") as f:
-              f.write(answer)
+          if "Output format: DOCX" in prompt.upper():
+              doc = Document()
+              doc.add_heading("AI Generated Document", level=1)
+              doc.add_paragraph(answer)
+              doc.save("output.docx")
 
-          print("output.txt generated")
+              with open("artifact_name.txt", "w") as f:
+                  f.write("output.docx")
+
+              print("Generated output.docx")
+
+          else:
+              with open("output.txt", "w", encoding="utf-8") as f:
+                  f.write(answer)
+
+              with open("artifact_name.txt", "w") as f:
+                  f.write("output.txt")
+
+              print("Generated output.txt")
+
           EOF
 
-      - name: Upload output.txt artifact
+      - name: Upload TXT Artifact
+        if: hashFiles('output.txt') != ''
         uses: actions/upload-artifact@v4
         with:
-          name: ai-response
+          name: ai-output-txt
           path: output.txt
+          retention-days: 30
+
+      - name: Upload DOCX Artifact
+        if: hashFiles('output.docx') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-output-docx
+          path: output.docx
           retention-days: 30
