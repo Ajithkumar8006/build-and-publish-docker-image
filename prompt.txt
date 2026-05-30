@@ -1,1 +1,10 @@
-explain about the windows command "dns/flush" and what will be the output look like ? in two lines
+Output format: DOCX
+
+Create a detailed document explaining Azure Key Vault.
+
+Include:
+- Introduction
+- Features
+- Architecture
+- Best Practices
+- Security Considerations
