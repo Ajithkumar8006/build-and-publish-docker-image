@@ -28,7 +28,7 @@ steps:
     env:
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
     run: |
-      python << 'EOF'
+      python <<'EOF'
       import os
       import re
       import json
@@ -78,8 +78,6 @@ steps:
           timeout=300
       )
 
-      print("Status:", response.status_code)
-
       result = response.json()
 
       if "choices" not in result:
@@ -87,8 +85,6 @@ steps:
           raise Exception("OpenRouter request failed")
 
       answer = result["choices"][0]["message"]["content"]
-
-      artifact_file = ""
 
       if output_format == "DOCX":
           doc = Document()
@@ -98,13 +94,10 @@ steps:
               if line.strip():
                   doc.add_paragraph(line)
 
-          artifact_file = "output.docx"
-          doc.save(artifact_file)
+          doc.save("output.docx")
 
       elif output_format == "PDF":
-          artifact_file = "output.pdf"
-
-          pdf = SimpleDocTemplate(artifact_file)
+          pdf = SimpleDocTemplate("output.pdf")
           styles = getSampleStyleSheet()
 
           content = []
@@ -119,24 +112,14 @@ steps:
           pdf.build(content)
 
       else:
-          artifact_file = "output.txt"
-
           with open(
-              artifact_file,
+              "output.txt",
               "w",
               encoding="utf-8"
           ) as f:
               f.write(answer)
 
-      with open("artifact_name.txt", "w") as f:
-          f.write(artifact_file)
-
-      print(f"Generated {artifact_file}")
       EOF
-
-  - name: Verify Output
-    run: |
-      ls -lah
 
   - name: Upload Artifact
     uses: actions/upload-artifact@v4
