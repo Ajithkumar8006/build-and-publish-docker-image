@@ -10,7 +10,6 @@ jobs:
 generate:
 runs-on: ubuntu-latest
 
-```
 steps:
   - name: Checkout Repository
     uses: actions/checkout@v4
@@ -22,43 +21,22 @@ steps:
 
   - name: Install Dependencies
     run: |
-      pip install requests python-docx reportlab
+      pip install requests python-docx
 
-  - name: Generate File
+  - name: Generate DOCX
     env:
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
     run: |
-      python <<'EOF'
+      python << 'EOF'
       import os
-      import re
       import json
       import requests
       from docx import Document
-      from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-      from reportlab.lib.styles import getSampleStyleSheet
 
       api_key = os.environ["OPENROUTER_API_KEY"]
 
       with open("prompt.txt", "r", encoding="utf-8") as f:
-          prompt_text = f.read()
-
-      output_format = "TXT"
-
-      match = re.search(
-          r'OUTPUT_FORMAT\s*=\s*(TXT|DOCX|PDF)',
-          prompt_text,
-          re.IGNORECASE
-      )
-
-      if match:
-          output_format = match.group(1).upper()
-
-      prompt_text = re.sub(
-          r'OUTPUT_FORMAT\s*=\s*(TXT|DOCX|PDF)',
-          '',
-          prompt_text,
-          flags=re.IGNORECASE
-      ).strip()
+          prompt = f.read().strip()
 
       response = requests.post(
           "https://openrouter.ai/api/v1/chat/completions",
@@ -71,12 +49,14 @@ steps:
               "messages": [
                   {
                       "role": "user",
-                      "content": prompt_text
+                      "content": prompt
                   }
               ]
           },
           timeout=300
       )
+
+      print("Status Code:", response.status_code)
 
       result = response.json()
 
@@ -86,49 +66,26 @@ steps:
 
       answer = result["choices"][0]["message"]["content"]
 
-      if output_format == "DOCX":
-          doc = Document()
-          doc.add_heading("AI Generated Document", level=1)
+      doc = Document()
 
-          for line in answer.splitlines():
-              if line.strip():
-                  doc.add_paragraph(line)
+      doc.add_heading("AI Generated Document", level=1)
 
-          doc.save("output.docx")
+      for line in answer.splitlines():
+          if line.strip():
+              doc.add_paragraph(line)
 
-      elif output_format == "PDF":
-          pdf = SimpleDocTemplate("output.pdf")
-          styles = getSampleStyleSheet()
+      doc.save("output.docx")
 
-          content = []
-
-          for line in answer.splitlines():
-              if line.strip():
-                  content.append(
-                      Paragraph(line, styles["BodyText"])
-                  )
-                  content.append(Spacer(1, 6))
-
-          pdf.build(content)
-
-      else:
-          with open(
-              "output.txt",
-              "w",
-              encoding="utf-8"
-          ) as f:
-              f.write(answer)
-
+      print("Created output.docx")
       EOF
 
-  - name: Upload Artifact
+  - name: Verify Output
+    run: |
+      ls -lah
+
+  - name: Upload DOCX Artifact
     uses: actions/upload-artifact@v4
     with:
-      name: ai-generated-output
-      path: |
-        output.txt
-        output.docx
-        output.pdf
-      if-no-files-found: ignore
+      name: ai-generated-docx
+      path: output.docx
       retention-days: 30
-```
