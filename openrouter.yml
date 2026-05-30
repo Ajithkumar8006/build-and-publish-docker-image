@@ -1,0 +1,75 @@
+name: OpenRouter Prompt Processor
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - prompt.txt
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Generate output.txt
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          python << 'EOF'
+          import requests
+          import json
+          import os
+
+          api_key = os.environ["OPENROUTER_API_KEY"]
+
+          with open("prompt.txt", "r", encoding="utf-8") as f:
+              prompt = f.read().strip()
+
+          response = requests.post(
+              "https://openrouter.ai/api/v1/chat/completions",
+              headers={
+                  "Authorization": f"Bearer {api_key}",
+                  "Content-Type": "application/json"
+              },
+              json={
+                  "model": "openai/gpt-oss-20b:free",
+                  "messages": [
+                      {
+                          "role": "user",
+                          "content": prompt
+                      }
+                  ]
+              }
+          )
+
+          result = response.json()
+
+          if "choices" not in result:
+              print(json.dumps(result, indent=2))
+              raise Exception("OpenRouter request failed")
+
+          answer = result["choices"][0]["message"]["content"]
+
+          with open("output.txt", "w", encoding="utf-8") as f:
+              f.write(answer)
+
+          print("output.txt generated")
+          EOF
+
+      - name: Upload output.txt artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-response
+          path: output.txt
+          retention-days: 30
